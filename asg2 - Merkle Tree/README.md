@@ -1,6 +1,6 @@
 # Merkle Tree
 
-The relevant code files in `cmd/test/main.go` & `pkg/merkletree/merkletree.go`.
+The relevant code files are in `cmd/test/main.go` & `pkg/merkletree/merkletree.go`.
 
 ### Usage
 
@@ -13,5 +13,5 @@ make rng
 ./generator <file_name> <intended_file_size (in MBs)>
 
 # Run
-./merkle <filename> # OR: `make` to run on the sample file
+./merkle <file_name> # OR: `make` to run on the sample file
 ```
