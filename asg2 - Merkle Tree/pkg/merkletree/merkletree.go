@@ -1,10 +1,12 @@
 package merkletree
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"hash"
+	"log"
 	"os"
 )
 
@@ -15,7 +17,7 @@ const (
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
 	t      int64     // no. of tiers
-	n      int       // no. of leaves -- TODO: remove?
+	n      int       // no. of leaves
 }
 
 type Node struct {
@@ -25,6 +27,61 @@ type Node struct {
 	Parent *Node
 	leaf   bool
 	idx    int // index of this node within its level
+}
+
+func Verify(mt *MerkleTree, f *os.File, idx, run int64) bool {
+	defer f.Close()
+
+	h, err := hash_file_chunk(f, idx, run)
+
+	if err != nil {
+		return false
+	}
+
+	return Prove_digest(mt, h.Sum(nil))
+}
+
+// Receives a leaf digest and returns whether it's a member of the tree or not
+func Prove_digest(mt *MerkleTree, hash []byte) bool {
+	idx := find_leaf_index(mt, hash)
+	if idx == -1 {
+		return false
+	}
+
+	var li, ri, pi int
+	t := int64(0)
+
+	// Compare our produced hash with the root hash
+	for t < mt.t-1 {
+		if idx%2 == 0 {
+			li = idx
+			ri = idx + 1
+		} else {
+			li = idx - 1
+			ri = idx
+		}
+		pi = li / 2
+
+		_d := hash_childrens_data(mt.hashes[t][li], mt.hashes[t][ri])
+
+		if !bytes.Equal(_d, mt.hashes[t+1][pi].Data) {
+			return false
+		}
+
+		idx = pi
+		t++
+	}
+
+	return true
+}
+
+func find_leaf_index(mt *MerkleTree, target []byte) int {
+	for i := 0; i < mt.n; i++ {
+		if bytes.Equal(target, mt.hashes[0][i].Data) {
+			return i
+		}
+	}
+	return -1
 }
 
 func Init_tree_from_file(fpath string) (*MerkleTree, error) {
@@ -42,7 +99,7 @@ func Init_tree_from_file(fpath string) (*MerkleTree, error) {
 		return nil, err
 	}
 
-	mt, err := Init_tree_from_digests(digests)
+	mt, err := init_tree_from_digests(digests)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +125,7 @@ func Print_tree(mt *MerkleTree) {
 	}
 }
 
-func Init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
+func init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
 	// NOTE: Currently only works when there are 2^x chunks
 	nodeCount := len(digests)
 	if nodeCount > 0 && nodeCount&(nodeCount-1) != 0 {
@@ -145,18 +202,19 @@ func hash_childrens_data(left, right *Node) []byte {
 func open_file_and_get_size(fpath string) (*os.File, int64, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, 0, err
 	}
 
 	fi, err := f.Stat()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return nil, 0, err
 	}
 
+	// TODO: test
 	if fi.Size() < 32 {
-		fmt.Println("File is too small!")
+		log.Println("File is too small!")
 		return nil, 0, err
 	}
 
@@ -175,6 +233,28 @@ func gen_chunk_indexes(fsize, cnum int64) []int64 {
 	return chunkIndexes
 }
 
+// Write `target` bytes, starting at the `start`-th byte, in file `f` into a hash object
+func hash_file_chunk(f *os.File, start, target int64) (hash.Hash, error) {
+	h := sha256.New()
+	read := int64(0)
+
+	for read < target {
+		size := min(4096, target-read)
+		buf := make([]byte, size)
+
+		n, err := f.ReadAt(buf, start+read)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+
+		read += int64(n)
+		h.Write(buf)
+	}
+
+	return h, nil
+}
+
 // From a given file, with cnum chunks at indexes cidxs, return cnum sha256sums
 func gen_digests_from_file(f *os.File, cidxs []int64, cnum int64) ([][]byte, error) {
 	defer f.Close()
@@ -184,24 +264,12 @@ func gen_digests_from_file(f *os.File, cidxs []int64, cnum int64) ([][]byte, err
 	}
 
 	for i := 0; i < len(cidxs)-1; i++ {
-		readTarget := cidxs[i+1] - cidxs[i]
-		read := int64(0)
-
-		// TODO: multithread
-		for read < readTarget {
-			size := min(4096, readTarget-read)
-			buf := make([]byte, size)
-
-			n, err := f.ReadAt(buf, cidxs[i]+read)
-			if err != nil {
-				fmt.Println(err)
-				return nil, err
-			}
-
-			read += int64(n)
-			hashes[i].Write(buf)
+		// TODO: multithread?
+		h, err := hash_file_chunk(f, cidxs[i], cidxs[i+1]-cidxs[i])
+		if err != nil {
+			return nil, err
 		}
-		//
+		hashes[i] = h
 	}
 
 	sums := make([][]byte, cnum)
