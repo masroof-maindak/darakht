@@ -10,8 +10,8 @@ make build
 
 # Generate a random file
 make rng
-./generator <file_name> <intended_file_size (in MBs)>
+./rngF <fileName> <IntendedFileSize (MBs)>
 
 # Run
-./merkle <file_name> # OR: `make` to run on the sample file
+./merkle <fileName> # OR: `make` to run on the sample file
 ```
