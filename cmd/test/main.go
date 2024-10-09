@@ -14,11 +14,11 @@ func main() {
 	fpath := os.Args[1]
 
 	//
-	// Constructing merkletree
+	// Constructing Merkle Tree
 	//
 	mt, err := merkletree.Init_tree_from_file(fpath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error generating merkletree\n")
+		fmt.Fprintln(os.Stderr, "Error generating merkletree")
 		return
 	}
 	merkletree.Print_tree(mt)
@@ -28,12 +28,12 @@ func main() {
 	//
 	f, err := os.Open(fpath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening file for verification\n")
+		fmt.Fprintln(os.Stderr, "Error opening file for verification")
 		return
 	}
 	defer f.Close()
 
-	exists := merkletree.Verify(mt, f, 1, 3)
+	exists := merkletree.Verify(mt, f, 4, 2)
 
 	if exists {
 		fmt.Println("Digest exists")
