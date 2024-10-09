@@ -85,13 +85,13 @@ func find_leaf_index(mt *MerkleTree, target []byte) int {
 }
 
 func Init_tree_from_file(fpath string) (*MerkleTree, error) {
-	f, fsize, err := open_file_and_get_size(fpath)
+	// TODO(?): let user override this, or chunk size
+	cnum := NUM_CHUNKS
+
+	f, fsize, err := open_file_and_get_size(fpath, cnum)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: let user override this
-	cnum := NUM_CHUNKS
 
 	cidxs := gen_chunk_indexes(fsize, cnum)
 	digests, err := gen_digests_from_file(f, cidxs, cnum)
@@ -126,7 +126,6 @@ func Print_tree(mt *MerkleTree) {
 }
 
 func init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
-	// NOTE: Currently only works when there are 2^x chunks
 	nodeCount := len(digests)
 	if nodeCount > 0 && nodeCount&(nodeCount-1) != 0 {
 		return nil, errors.New("no. of digests is not a power of 2")
@@ -191,15 +190,13 @@ func create_parent(idx int, left, right *Node) *Node {
 }
 
 func hash_childrens_data(left, right *Node) []byte {
-	h1 := left.Data
-	h2 := right.Data
 	// NOTE: we must convert to string else it SHAs the byte data
-	conc := fmt.Sprintf("%x", h1) + fmt.Sprintf("%x", h2)
+	conc := fmt.Sprintf("%x", left.Data) + fmt.Sprintf("%x", right.Data)
 	hash := sha256.Sum256([]byte(conc))
 	return hash[:]
 }
 
-func open_file_and_get_size(fpath string) (*os.File, int64, error) {
+func open_file_and_get_size(fpath string, cnum int64) (*os.File, int64, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
 		log.Println(err)
@@ -212,8 +209,7 @@ func open_file_and_get_size(fpath string) (*os.File, int64, error) {
 		return nil, 0, err
 	}
 
-	// TODO: test
-	if fi.Size() < 32 {
+	if fi.Size() < cnum {
 		log.Println("File is too small!")
 		return nil, 0, err
 	}
