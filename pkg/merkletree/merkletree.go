@@ -28,17 +28,17 @@ type Node struct {
 }
 
 func Verify(mt *MerkleTree, f *os.File, idx, run int64) bool {
-	h, err := hash_file_chunk(f, idx, run)
+	h, err := hashFileChunk(f, idx, run)
 	if err != nil {
 		return false
 	}
 
-	return Prove_digest(mt, h.Sum(nil))
+	return ProveDigest(mt, h.Sum(nil))
 }
 
 // Receives a leaf digest and returns whether it's a member of the tree or not
-func Prove_digest(mt *MerkleTree, hash []byte) bool {
-	idx := find_leaf_index(mt, hash)
+func ProveDigest(mt *MerkleTree, hash []byte) bool {
+	idx := findLeafIndex(mt, hash)
 	if idx == -1 {
 		return false
 	}
@@ -57,7 +57,7 @@ func Prove_digest(mt *MerkleTree, hash []byte) bool {
 		}
 		pi = li / 2
 
-		hd := hash_childrens_data(mt.hashes[t][li], mt.hashes[t][ri])
+		hd := hashChildrensData(mt.hashes[t][li], mt.hashes[t][ri])
 		if !bytes.Equal(hd, mt.hashes[t+1][pi].Data) {
 			return false
 		}
@@ -69,7 +69,7 @@ func Prove_digest(mt *MerkleTree, hash []byte) bool {
 	return true
 }
 
-func find_leaf_index(mt *MerkleTree, target []byte) int {
+func findLeafIndex(mt *MerkleTree, target []byte) int {
 	for i := 0; i < mt.n; i++ {
 		if bytes.Equal(target, mt.hashes[0][i].Data) {
 			return i
@@ -78,7 +78,7 @@ func find_leaf_index(mt *MerkleTree, target []byte) int {
 	return -1
 }
 
-func Init_tree_from_file(fpath string) (*MerkleTree, error) {
+func InitTreeFromFile(fpath string) (*MerkleTree, error) {
 	// TODO(?): let user override this, or provide chunk size
 	cnum := NUM_CHUNKS
 
@@ -89,18 +89,18 @@ func Init_tree_from_file(fpath string) (*MerkleTree, error) {
 	}
 	defer f.Close();
 
-	fsize, err := get_file_size(f, cnum)
+	fsize, err := getFileSize(f, cnum)
 	if err != nil {
 		return nil, err
 	}
 
-	cidxs := gen_chunk_indexes(fsize, cnum)
-	digests, err := gen_digests_from_file(f, cidxs, cnum)
+	cidxs := genChunkIndexes(fsize, cnum)
+	digests, err := genDigestsFromFile(f, cidxs, cnum)
 	if err != nil {
 		return nil, err
 	}
 
-	mt, err := init_tree_from_digests(digests)
+	mt, err := initTreeFromDigests(digests)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func Init_tree_from_file(fpath string) (*MerkleTree, error) {
 	return mt, nil
 }
 
-func get_tier_from_n(n int64) int {
+func getTierFromN(n int64) int {
 	ret := 0
 	for n > 0 {
 		n = (n >> 1)
@@ -117,7 +117,7 @@ func get_tier_from_n(n int64) int {
 	return ret
 }
 
-func Print_tree(mt *MerkleTree) {
+func PrintTree(mt *MerkleTree) {
 	for i := 0; i < mt.t; i++ {
 		fmt.Printf("\nLevel %d\n\n", i)
 		for j := 0; j < len(mt.hashes[i]); j++ {
@@ -126,13 +126,13 @@ func Print_tree(mt *MerkleTree) {
 	}
 }
 
-func init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
+func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	nodeCount := len(digests)
 	if nodeCount > 0 && nodeCount&(nodeCount-1) != 0 {
 		return nil, errors.New("no. of digests is not a power of 2")
 	}
 
-	mt, err := init_tree_and_leaves(digests, nodeCount)
+	mt, err := initTreeAndLeaves(digests, nodeCount)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
 	for nodeCount > 0 {
 		mt.hashes[t] = make([]*Node, nodeCount)
 		for i := 0; i < nodeCount; i++ {
-			mt.hashes[t][i] = create_parent(i, mt.hashes[t-1][2*i], mt.hashes[t-1][2*i+1])
+			mt.hashes[t][i] = createParent(i, mt.hashes[t-1][2*i], mt.hashes[t-1][2*i+1])
 			mt.hashes[t-1][2*i].Parent = mt.hashes[t][i]
 			mt.hashes[t-1][2*i+1].Parent = mt.hashes[t][i]
 		}
@@ -154,8 +154,8 @@ func init_tree_from_digests(digests [][]byte) (*MerkleTree, error) {
 	return mt, nil
 }
 
-func init_tree_and_leaves(digests [][]byte, n int) (*MerkleTree, error) {
-	t := get_tier_from_n(int64(n))
+func initTreeAndLeaves(digests [][]byte, n int) (*MerkleTree, error) {
+	t := getTierFromN(int64(n))
 
 	mt := &MerkleTree{
 		hashes: make([][]*Node, t),
@@ -178,8 +178,8 @@ func init_tree_and_leaves(digests [][]byte, n int) (*MerkleTree, error) {
 	return mt, nil
 }
 
-func create_parent(idx int, left, right *Node) *Node {
-	d := hash_childrens_data(left, right)
+func createParent(idx int, left, right *Node) *Node {
+	d := hashChildrensData(left, right)
 	return &Node{
 		Data:   d,
 		leaf:   false,
@@ -190,14 +190,14 @@ func create_parent(idx int, left, right *Node) *Node {
 	}
 }
 
-func hash_childrens_data(left, right *Node) []byte {
+func hashChildrensData(left, right *Node) []byte {
 	// NOTE: we must convert to string else it SHAs the byte data
 	conc := fmt.Sprintf("%x", left.Data) + fmt.Sprintf("%x", right.Data)
 	hash := sha256.Sum256([]byte(conc))
 	return hash[:]
 }
 
-func get_file_size(f *os.File, cnum int64) (int64, error) {
+func getFileSize(f *os.File, cnum int64) (int64, error) {
 	fi, err := f.Stat()
 	if err != nil {
 		log.Println(err)
@@ -212,7 +212,7 @@ func get_file_size(f *os.File, cnum int64) (int64, error) {
 	return fi.Size(), nil
 }
 
-func gen_chunk_indexes(fsize, cnum int64) []int64 {
+func genChunkIndexes(fsize, cnum int64) []int64 {
 	csize := (fsize / cnum)
 	cidxs := make([]int64, cnum+1)
 
@@ -224,13 +224,13 @@ func gen_chunk_indexes(fsize, cnum int64) []int64 {
 	return cidxs
 }
 
-// Write `target` bytes, starting at the `start`-th byte, in file `f` into a hash object
-func hash_file_chunk(f *os.File, start, target int64) (hash.Hash, error) {
+// Write 'length' bytes, starting at the 'start'-th byte, in file 'f' into a hash object
+func hashFileChunk(f *os.File, start, length int64) (hash.Hash, error) {
 	h := sha256.New()
 	read := int64(0)
 
-	for read < target {
-		size := min(4096, target-read)
+	for read < length {
+		size := min(4096, length-read)
 		buf := make([]byte, size)
 
 		n, err := f.ReadAt(buf, start+read)
@@ -247,7 +247,7 @@ func hash_file_chunk(f *os.File, start, target int64) (hash.Hash, error) {
 }
 
 // From a given file, with cnum chunks at indexes cidxs, return cnum sha256sums
-func gen_digests_from_file(f *os.File, cidxs []int64, cnum int64) ([][]byte, error) {
+func genDigestsFromFile(f *os.File, cidxs []int64, cnum int64) ([][]byte, error) {
 	hashes := make([]hash.Hash, cnum)
 	for i := int64(0); i < cnum; i++ {
 		hashes[i] = sha256.New()
@@ -255,7 +255,7 @@ func gen_digests_from_file(f *os.File, cidxs []int64, cnum int64) ([][]byte, err
 
 	for i := 0; i < len(cidxs)-1; i++ {
 		// TODO(?): multithread
-		h, err := hash_file_chunk(f, cidxs[i], cidxs[i+1]-cidxs[i])
+		h, err := hashFileChunk(f, cidxs[i], cidxs[i+1]-cidxs[i])
 		if err != nil {
 			return nil, err
 		}

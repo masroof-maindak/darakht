@@ -16,12 +16,12 @@ func main() {
 	//
 	// Constructing Merkle Tree
 	//
-	mt, err := merkletree.Init_tree_from_file(fpath)
+	mt, err := merkletree.InitTreeFromFile(fpath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error generating merkletree")
 		return
 	}
-	merkletree.Print_tree(mt)
+	merkletree.PrintTree(mt)
 
 	//
 	// Proving membership of the hash of "cd"
