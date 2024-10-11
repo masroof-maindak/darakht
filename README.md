@@ -32,8 +32,8 @@ mt1, err := merkletree.InitTreeFromFile(fpath, cnum)
 // [TODO]: mt2, err := merkletree.RecoverTreeFromJSON()
 
 // -- Validation --
+// equal := merkletree.Equals(mt1, mt2)
 // [TODO]: valid, err := merkletree.ValidateTreeJSON
-// [TODO]: equal := merkletree.Equals(mt1, mt2)
 
 // -- Proof of membership --
 exists, err := merkletree.ProveMembershipFromFile(mt1, f, 4, 2)

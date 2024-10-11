@@ -18,12 +18,10 @@ type MerkleTree struct {
 }
 
 type Node struct {
-	Data   []byte
-	Left   *Node
-	Right  *Node
-	Parent *Node
-	leaf   bool
-	idx    int // index of this node within its tier
+	Data  []byte
+	Left  *Node
+	Right *Node
+	idx   int // index of this node within its tier
 }
 
 func ProveMember(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
@@ -33,6 +31,35 @@ func ProveMember(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
 	}
 
 	return ProveDigest(mt, h.Sum(nil)), nil
+}
+
+func Equals(mt1, mt2 *MerkleTree) bool {
+	if mt1 == mt2 {
+		return true
+	}
+
+	if mt1 == nil || mt2 == nil {
+		return false
+	}
+
+	if !(mt1.n == mt2.n && mt1.t == mt2.t) {
+		return false
+	}
+
+	depth := mt1.t
+	width := mt1.n
+
+	for t := 0; t < depth; t, width = t+1, width/2 {
+		for i := 0; i < width; i++ {
+			n1 := mt1.hashes[t][i]
+			n2 := mt2.hashes[t][i]
+			if !(bytes.Equal(n1.Data, n2.Data) && n1.idx == n2.idx) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // Receives a leaf digest and returns whether it's a member of the tree or not
@@ -152,8 +179,6 @@ func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 		mt.hashes[t] = make([]*Node, nodeCount)
 		for i := 0; i < nodeCount; i++ {
 			mt.hashes[t][i] = createParent(i, mt.hashes[t-1][2*i], mt.hashes[t-1][2*i+1])
-			mt.hashes[t-1][2*i].Parent = mt.hashes[t][i]
-			mt.hashes[t-1][2*i+1].Parent = mt.hashes[t][i]
 		}
 		nodeCount /= 2
 		t++
@@ -174,12 +199,10 @@ func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 	mt.hashes[0] = make([]*Node, n)
 	for i := 0; i < n; i++ {
 		mt.hashes[0][i] = &Node{
-			Data:   digests[i],
-			leaf:   true,
-			Left:   nil,
-			Right:  nil,
-			Parent: nil,
-			idx:    i,
+			Data:  digests[i],
+			Left:  nil,
+			Right: nil,
+			idx:   i,
 		}
 	}
 
@@ -189,12 +212,10 @@ func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 func createParent(idx int, left, right *Node) *Node {
 	d := hashChildrensData(left, right)
 	return &Node{
-		Data:   d,
-		leaf:   false,
-		Left:   left,
-		Right:  right,
-		Parent: nil,
-		idx:    idx,
+		Data:  d,
+		Left:  left,
+		Right: right,
+		idx:   idx,
 	}
 }
 

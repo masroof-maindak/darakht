@@ -9,54 +9,85 @@ import (
 	"github.com/masroof-maindak/darakht/pkg/merkletree"
 )
 
-const testCnum = 16
+const (
+	cnum  int64  = 16
+	fname string = "sample-*.txt"
 
-var testF *os.File
+	equalityErr string = "Expected merkle trees to be equal"
+	memberErr   string = "Expected byte range to exist in Merkle tree"
+	rootErr     string = "Invalid Merkle Root"
+)
+
+var (
+	f *os.File = nil
+)
 
 func TestMain(m *testing.M) {
 	var err error
-	testF, err = os.CreateTemp("", "sample-*.txt")
+	f, err = os.CreateTemp("", fname)
 	if err != nil {
 		log.Println("Error creating test file")
 		os.Exit(1)
 	}
 
-	testF.WriteString("abcdefghijklmnopqrstuvwxyz123456789")
+	f.WriteString("abcdefghijklmnopqrstuvwxyz123456789")
 
 	defer func() {
-		if err := testF.Close(); err != nil {
+		if err := f.Close(); err != nil {
 			log.Println("Error closing temp file:", err)
 		}
-		os.Remove(testF.Name())
+		os.Remove(f.Name())
 	}()
 
 	os.Exit(m.Run())
 }
 
-func TestMerkleRoot(t *testing.T) {
-	mt, err := merkletree.InitTreeFromFile(testF, testCnum)
+func TestConstructionAndMerkleRoot(t *testing.T) {
+	mt, err := merkletree.InitTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}
 
 	root := fmt.Sprintf("%x", merkletree.MerkleRoot(mt))
 	if root != "857a51b0311986c84ed67794c70fa4509c0e744aa69cda1774514d02dbbad7cb" {
-		t.Error("Invalid Merkle Root!")
+		t.Error(rootErr)
+	}
+}
+
+func TestEquals(t *testing.T) {
+	var mt1, mt2 *merkletree.MerkleTree
+	var err error
+
+	mt1, err = merkletree.InitTreeFromFile(f, cnum)
+	if err != nil {
+		t.Error(err)
+	}
+	mt2 = mt1
+	if !merkletree.Equals(mt1, mt2) {
+		t.Error(equalityErr)
+	}
+
+	mt2, err = merkletree.InitTreeFromFile(f, cnum)
+	if err != nil {
+		t.Error(err)
+	}
+	if !merkletree.Equals(mt1, mt2) {
+		t.Error(equalityErr)
 	}
 }
 
 func TestProveMember(t *testing.T) {
-	mt, err := merkletree.InitTreeFromFile(testF, testCnum)
+	mt, err := merkletree.InitTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}
 
-	exists, err := merkletree.ProveMember(mt, testF, 4, 2)
+	exists, err := merkletree.ProveMember(mt, f, 4, 2)
 	if err != nil {
 		t.Error(err)
 	}
 
 	if !exists {
-		t.Error("Expected byte range to exist in Merkle tree")
+		t.Error(memberErr)
 	}
 }
