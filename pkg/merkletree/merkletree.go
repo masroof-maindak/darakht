@@ -1,6 +1,7 @@
 package merkletree
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"errors"
@@ -136,33 +137,36 @@ func getTierFromN(n int64) int {
 	return ret
 }
 
-func PrintTree(mt *MerkleTree) {
+func PrintTree(mt *MerkleTree) error {
 	depth, width := mt.t, mt.n
+	w := bufio.NewWriter(os.Stdout)
 
-	fmt.Println("{")
-	fmt.Printf("\t\"root\": \"%x\",\n", MerkleRoot(mt))
-	fmt.Printf("\t\"t\": %d,\n", depth)
-	fmt.Printf("\t\"n\": %d,\n", width)
-	fmt.Printf("\t\"hashes\": [\n")
+	fmt.Fprintf(w, "{\n")
+	fmt.Fprintf(w, "\t\"root\": \"%x\",\n", MerkleRoot(mt))
+	fmt.Fprintf(w, "\t\"t\": %d,\n", depth)
+	fmt.Fprintf(w, "\t\"n\": %d,\n", width)
+	fmt.Fprintf(w, "\t\"hashes\": [\n")
 
 	for t := 0; t < depth; t, width = t+1, width/2 {
-		fmt.Println("\t\t[")
+		fmt.Fprintf(w, "\t\t[\n")
 
 		for i := 0; i < width; i++ {
-			fmt.Printf("\t\t\t\"%x\"", mt.hashes[t][i].Data)
+			fmt.Fprintf(w, "\t\t\t\"%x\"", mt.hashes[t][i].Data)
 			if i != width-1 {
-				fmt.Println(",")
+				fmt.Fprintf(w, ",\n")
 			}
 		}
 
-		fmt.Print("\n\t\t]")
+		fmt.Fprintf(w, "\n\t\t]")
 		if t != depth-1 {
-			fmt.Println(",")
+			fmt.Fprintf(w, ",\n")
 		}
 	}
 
-	fmt.Println("\n\t]")
-	fmt.Println("}")
+	fmt.Fprintf(w, "\n\t]\n")
+	fmt.Fprintf(w, "}\n")
+
+	return w.Flush()
 }
 
 func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {

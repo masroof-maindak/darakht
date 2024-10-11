@@ -39,7 +39,11 @@ func constructAndPrint(f *os.File, cnum int64) {
 		log.Println("Merkle Tree generation failed:", err)
 		return
 	}
-	merkletree.PrintTree(mt)
+
+	if err = merkletree.PrintTree(mt); err != nil {
+		log.Println("Buffered IO failed:", err)
+		return
+	}
 }
 
 func proveMembership() {
