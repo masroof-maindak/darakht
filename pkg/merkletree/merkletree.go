@@ -9,7 +9,8 @@ import (
 	"os"
 )
 
-const NUM_CHUNKS int64 = 8
+// NOTE: tests assume this is 16
+const NUM_CHUNKS int64 = 16
 
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
@@ -115,27 +116,26 @@ func getTierFromN(n int64) int {
 }
 
 func PrintTree(mt *MerkleTree) {
-	fmt.Println("{")
+	depth, width := mt.t, mt.n
 
+	fmt.Println("{")
 	fmt.Printf("\t\"root\": \"%x\",\n", MerkleRoot(mt))
-	fmt.Printf("\t\"t\": %d,\n", mt.t)
-	fmt.Printf("\t\"n\": %d,\n", mt.n)
+	fmt.Printf("\t\"t\": %d,\n", depth)
+	fmt.Printf("\t\"n\": %d,\n", width)
 	fmt.Printf("\t\"hashes\": [\n")
 
-	// TODO: range-based for loops & other optimisations
-
-	for t := 0; t < mt.t; t++ {
+	for t := 0; t < depth; t, width = t+1, width/2 {
 		fmt.Println("\t\t[")
 
-		for idx := 0; idx < len(mt.hashes[t]); idx++ {
-			fmt.Printf("\t\t\t\"%x\"", mt.hashes[t][idx].Data)
-			if idx != len(mt.hashes[t])-1 {
+		for i := 0; i < width; i++ {
+			fmt.Printf("\t\t\t\"%x\"", mt.hashes[t][i].Data)
+			if i != width-1 {
 				fmt.Println(",")
 			}
 		}
 
 		fmt.Print("\n\t\t]")
-		if t != mt.t-1 {
+		if t != depth-1 {
 			fmt.Println(",")
 		}
 	}
