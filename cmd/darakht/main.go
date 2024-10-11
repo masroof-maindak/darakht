@@ -20,13 +20,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	constructAndPrint(*fpath, *cnum)
+	f, err := os.Open(*fpath)
+	if err != nil {
+		log.Println(err)
+		os.Exit(2)
+	}
+	defer f.Close()
+
+	// TODO: Decide what to execute
+	constructAndPrint(f, *cnum)
 	proveMembership()
 }
 
 // Construct a Merkle Tree from a file and print it to stdout
-func constructAndPrint(fpath string, cnum int64) {
-	mt, err := merkletree.InitTreeFromFile(fpath, cnum)
+func constructAndPrint(f *os.File, cnum int64) {
+	mt, err := merkletree.InitTreeFromFile(f, cnum)
 	if err != nil {
 		log.Println("Merkle Tree generation failed:", err)
 		return
@@ -39,13 +47,6 @@ func proveMembership() {
 	// 2. Open file
 	// 3. merkletree.ProveMember(mt, f, 4, 2)
 
-	// f, err := os.Open(*fpath)
-	// if err != nil {
-	// 	log.Println("Error opening file for verification:", err)
-	// 	return
-	// }
-	// defer f.Close()
-	//
 	// exists, err := merkletree.ProveMember(mt, f, 4, 2)
 	// if err != nil {
 	// 	log.Println("Error verifying block:", err)
@@ -53,9 +54,8 @@ func proveMembership() {
 	// }
 	//
 	// if exists {
-	// 	fmt.Println("Digest exists")
+	// 	fmt.Println("true")
 	// } else {
-	// 	fmt.Println("Digest does not exist")
+	// 	fmt.Println("false")
 	// }
-
 }

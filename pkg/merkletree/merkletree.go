@@ -76,16 +76,10 @@ func findLeafIndex(mt *MerkleTree, target []byte) int {
 	return -1
 }
 
-func InitTreeFromFile(fpath string, cnum int64) (*MerkleTree, error) {
+func InitTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
 	if cnum <= 0 {
 		return nil, errors.New("invalid leaf count")
 	}
-
-	f, err := os.Open(fpath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
 
 	fsize, err := getFileSize(f, cnum)
 	if err != nil {

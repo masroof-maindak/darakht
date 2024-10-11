@@ -2,37 +2,39 @@ package merkletree_test
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/masroof-maindak/darakht/pkg/merkletree"
 )
 
-const fpath = "sample.txt"
 const testCnum = 16
 
-func createTmpFile() error {
-	f, err := os.Create(fpath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+var testF *os.File
 
-	_, err = f.WriteString("abcdefghijklmnopqrstuvwxyz123456789")
+func TestMain(m *testing.M) {
+	var err error
+	testF, err = os.CreateTemp("", "sample-*.txt")
 	if err != nil {
-		return err
+		log.Println("Error creating test file")
+		os.Exit(1)
 	}
 
-	return nil
+	testF.WriteString("abcdefghijklmnopqrstuvwxyz123456789")
+
+	defer func() {
+		if err := testF.Close(); err != nil {
+			log.Println("Error closing temp file:", err)
+		}
+		os.Remove(testF.Name())
+	}()
+
+	os.Exit(m.Run())
 }
 
 func TestMerkleRoot(t *testing.T) {
-	if err := createTmpFile(); err != nil {
-		t.Error(err)
-	}
-	defer os.Remove(fpath)
-
-	mt, err := merkletree.InitTreeFromFile(fpath, testCnum)
+	mt, err := merkletree.InitTreeFromFile(testF, testCnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -43,24 +45,13 @@ func TestMerkleRoot(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
-	if err := createTmpFile(); err != nil {
-		t.Error(err)
-	}
-	defer os.Remove(fpath)
-
-	mt, err := merkletree.InitTreeFromFile(fpath, testCnum)
+func TestProveMember(t *testing.T) {
+	mt, err := merkletree.InitTreeFromFile(testF, testCnum)
 	if err != nil {
 		t.Error(err)
 	}
 
-	f, err := os.Open(fpath)
-	if err != nil {
-		t.Error(err)
-	}
-	defer f.Close()
-
-	exists, err := merkletree.ProveMember(mt, f, 4, 2)
+	exists, err := merkletree.ProveMember(mt, testF, 4, 2)
 	if err != nil {
 		t.Error(err)
 	}
