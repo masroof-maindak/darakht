@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"log"
 	"os"
 )
 
@@ -27,13 +26,13 @@ type Node struct {
 	idx    int // index of this node within its level
 }
 
-func Verify(mt *MerkleTree, f *os.File, idx, run int64) bool {
+func Verify(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
 	h, err := hashFileChunk(f, idx, run)
 	if err != nil {
-		return false
+		return false, err
 	}
 
-	return ProveDigest(mt, h.Sum(nil))
+	return ProveDigest(mt, h.Sum(nil)), nil
 }
 
 // Receives a leaf digest and returns whether it's a member of the tree or not
@@ -46,7 +45,6 @@ func ProveDigest(mt *MerkleTree, hash []byte) bool {
 	var li, ri, pi int
 	t := 0
 
-	// Compare our produced hash with the root hash
 	for t < mt.t-1 {
 		if idx%2 == 0 {
 			li = idx
@@ -84,10 +82,9 @@ func InitTreeFromFile(fpath string) (*MerkleTree, error) {
 
 	f, err := os.Open(fpath)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
-	defer f.Close();
+	defer f.Close()
 
 	fsize, err := getFileSize(f, cnum)
 	if err != nil {
@@ -118,6 +115,7 @@ func getTierFromN(n int64) int {
 }
 
 func PrintTree(mt *MerkleTree) {
+	// TODO: JSON output
 	for i := 0; i < mt.t; i++ {
 		fmt.Printf("\nLevel %d\n\n", i)
 		for j := 0; j < len(mt.hashes[i]); j++ {
@@ -132,11 +130,7 @@ func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 		return nil, errors.New("no. of digests is not a power of 2")
 	}
 
-	mt, err := initTreeAndLeaves(digests, nodeCount)
-	if err != nil {
-		return nil, err
-	}
-
+	mt := initTreeAndLeaves(digests, nodeCount)
 	nodeCount /= 2
 	t := 1
 
@@ -154,7 +148,7 @@ func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	return mt, nil
 }
 
-func initTreeAndLeaves(digests [][]byte, n int) (*MerkleTree, error) {
+func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 	t := getTierFromN(int64(n))
 
 	mt := &MerkleTree{
@@ -175,7 +169,7 @@ func initTreeAndLeaves(digests [][]byte, n int) (*MerkleTree, error) {
 		}
 	}
 
-	return mt, nil
+	return mt
 }
 
 func createParent(idx int, left, right *Node) *Node {
@@ -200,13 +194,11 @@ func hashChildrensData(left, right *Node) []byte {
 func getFileSize(f *os.File, cnum int64) (int64, error) {
 	fi, err := f.Stat()
 	if err != nil {
-		log.Println(err)
 		return 0, err
 	}
 
 	if fi.Size() < cnum {
-		log.Println("File is too small!")
-		return 0, err
+		return 0, errors.New("file is too small to be chunked")
 	}
 
 	return fi.Size(), nil
@@ -235,7 +227,6 @@ func hashFileChunk(f *os.File, start, length int64) (hash.Hash, error) {
 
 		n, err := f.ReadAt(buf, start+read)
 		if err != nil {
-			log.Println(err)
 			return nil, err
 		}
 

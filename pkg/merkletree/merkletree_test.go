@@ -59,7 +59,12 @@ func TestVerify(t *testing.T) {
 	}
 	defer f.Close()
 
-	if exists := merkletree.Verify(mt, f, 4, 2); !exists {
+	exists, err := merkletree.Verify(mt, f, 4, 2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !exists {
 		t.Error("Expected byte range to exist in Merkle tree")
 	}
 }

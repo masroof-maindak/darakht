@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/masroof-maindak/darakht/pkg/merkletree"
@@ -19,22 +20,26 @@ func main() {
 	//
 	mt, err := merkletree.InitTreeFromFile(fpath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error generating merkletree")
+		log.Println("Error generating merkletree: ", err)
 		return
 	}
 	merkletree.PrintTree(mt)
 
 	//
-	// Proving membership of the hash of "cd"
+	// Proving membership of the hash of "ef"
 	//
 	f, err := os.Open(fpath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error opening file for verification")
+		log.Println("Error opening file for verification: ", err)
 		return
 	}
 	defer f.Close()
 
-	exists := merkletree.Verify(mt, f, 4, 2)
+	exists, err := merkletree.Verify(mt, f, 4, 2)
+	if err != nil {
+		log.Println("Error verifying block: ", err)
+		return
+	}
 
 	if exists {
 		fmt.Println("Digest exists")
