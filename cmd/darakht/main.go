@@ -8,6 +8,7 @@ import (
 	"github.com/masroof-maindak/darakht/pkg/merkletree"
 )
 
+// TODO(?): command-line tool
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("Usage: ", os.Args[0], "<filename>")
@@ -18,6 +19,7 @@ func main() {
 	//
 	// Constructing Merkle Tree
 	//
+
 	mt, err := merkletree.InitTreeFromFile(fpath)
 	if err != nil {
 		log.Println("Error generating merkletree: ", err)
@@ -28,22 +30,23 @@ func main() {
 	//
 	// Proving membership of the hash of "ef"
 	//
-	f, err := os.Open(fpath)
-	if err != nil {
-		log.Println("Error opening file for verification: ", err)
-		return
-	}
-	defer f.Close()
 
-	exists, err := merkletree.Verify(mt, f, 4, 2)
-	if err != nil {
-		log.Println("Error verifying block: ", err)
-		return
-	}
-
-	if exists {
-		fmt.Println("Digest exists")
-	} else {
-		fmt.Println("Digest does not exist")
-	}
+	// f, err := os.Open(fpath)
+	// if err != nil {
+	// 	log.Println("Error opening file for verification: ", err)
+	// 	return
+	// }
+	// defer f.Close()
+	//
+	// exists, err := merkletree.Verify(mt, f, 4, 2)
+	// if err != nil {
+	// 	log.Println("Error verifying block: ", err)
+	// 	return
+	// }
+	//
+	// if exists {
+	// 	fmt.Println("Digest exists")
+	// } else {
+	// 	fmt.Println("Digest does not exist")
+	// }
 }

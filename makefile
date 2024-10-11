@@ -6,6 +6,7 @@ run:
 rng:
 	g++ misc/src.cpp -o rngF
 
+.SILENT:
 tmp:
 	go run cmd/darakht/main.go misc/sample-35b.txt
 

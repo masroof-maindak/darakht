@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-const NUM_CHUNKS int64 = 16
+const NUM_CHUNKS int64 = 8
 
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
@@ -23,7 +23,7 @@ type Node struct {
 	Right  *Node
 	Parent *Node
 	leaf   bool
-	idx    int // index of this node within its level
+	idx    int // index of this node within its tier
 }
 
 func Verify(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
@@ -115,13 +115,33 @@ func getTierFromN(n int64) int {
 }
 
 func PrintTree(mt *MerkleTree) {
-	// TODO: JSON output
-	for i := 0; i < mt.t; i++ {
-		fmt.Printf("\nLevel %d\n\n", i)
-		for j := 0; j < len(mt.hashes[i]); j++ {
-			fmt.Printf("%x\n", mt.hashes[i][j].Data)
+	fmt.Println("{")
+
+	fmt.Printf("\t\"root\": \"%x\",\n", MerkleRoot(mt))
+	fmt.Printf("\t\"t\": %d,\n", mt.t)
+	fmt.Printf("\t\"n\": %d,\n", mt.n)
+	fmt.Printf("\t\"hashes\": [\n")
+
+	// TODO: range-based for loops & other optimisations
+
+	for t := 0; t < mt.t; t++ {
+		fmt.Println("\t\t[")
+
+		for idx := 0; idx < len(mt.hashes[t]); idx++ {
+			fmt.Printf("\t\t\t\"%x\"", mt.hashes[t][idx].Data)
+			if idx != len(mt.hashes[t])-1 {
+				fmt.Println(",")
+			}
+		}
+
+		fmt.Print("\n\t\t]")
+		if t != mt.t-1 {
+			fmt.Println(",")
 		}
 	}
+
+	fmt.Println("\n\t]")
+	fmt.Println("}")
 }
 
 func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
