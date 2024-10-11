@@ -9,8 +9,7 @@ import (
 	"os"
 )
 
-// NOTE: tests assume this is 16
-const NUM_CHUNKS int64 = 16
+const NUM_CHUNKS int64 = 8
 
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
@@ -27,7 +26,7 @@ type Node struct {
 	idx    int // index of this node within its tier
 }
 
-func Verify(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
+func ProveMember(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
 	h, err := hashFileChunk(f, idx, run)
 	if err != nil {
 		return false, err
@@ -77,9 +76,10 @@ func findLeafIndex(mt *MerkleTree, target []byte) int {
 	return -1
 }
 
-func InitTreeFromFile(fpath string) (*MerkleTree, error) {
-	// TODO(?): let user override this, or provide chunk size
-	cnum := NUM_CHUNKS
+func InitTreeFromFile(fpath string, cnum int64) (*MerkleTree, error) {
+	if cnum <= 0 {
+		return nil, errors.New("invalid leaf count")
+	}
 
 	f, err := os.Open(fpath)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 )
 
 const fpath = "sample.txt"
+const testCnum = 16
 
 func createTmpFile() error {
 	f, err := os.Create(fpath)
@@ -31,7 +32,7 @@ func TestMerkleRoot(t *testing.T) {
 	}
 	defer os.Remove(fpath)
 
-	mt, err := merkletree.InitTreeFromFile(fpath)
+	mt, err := merkletree.InitTreeFromFile(fpath, testCnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -48,7 +49,7 @@ func TestVerify(t *testing.T) {
 	}
 	defer os.Remove(fpath)
 
-	mt, err := merkletree.InitTreeFromFile(fpath)
+	mt, err := merkletree.InitTreeFromFile(fpath, testCnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -59,7 +60,7 @@ func TestVerify(t *testing.T) {
 	}
 	defer f.Close()
 
-	exists, err := merkletree.Verify(mt, f, 4, 2)
+	exists, err := merkletree.ProveMember(mt, f, 4, 2)
 	if err != nil {
 		t.Error(err)
 	}
