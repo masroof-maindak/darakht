@@ -48,7 +48,7 @@ func TestConstructionAndMerkleRoot(t *testing.T) {
 		t.Error(err)
 	}
 
-	root := fmt.Sprintf("%x", merkletree.MerkleRoot(mt))
+	root := fmt.Sprintf("%x", mt.MerkleRoot())
 	if root != "857a51b0311986c84ed67794c70fa4509c0e744aa69cda1774514d02dbbad7cb" {
 		t.Error(rootErr)
 	}
@@ -63,7 +63,7 @@ func TestEquals(t *testing.T) {
 		t.Error(err)
 	}
 	mt2 = mt1
-	if !merkletree.Equals(mt1, mt2) {
+	if !mt1.Equals(mt2) {
 		t.Error(equalityErr)
 	}
 
@@ -71,7 +71,7 @@ func TestEquals(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !merkletree.Equals(mt1, mt2) {
+	if !mt1.Equals(mt2) {
 		t.Error(equalityErr)
 	}
 }
@@ -82,7 +82,7 @@ func TestProveMember(t *testing.T) {
 		t.Error(err)
 	}
 
-	exists, err := merkletree.ProveMember(mt, f, 4, 2)
+	exists, err := mt.ProveMember(f, 4, 2)
 	if err != nil {
 		t.Error(err)
 	}

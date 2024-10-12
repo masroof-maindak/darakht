@@ -40,7 +40,7 @@ func constructAndPrint(f *os.File, cnum int64) {
 		return
 	}
 
-	if err = merkletree.PrintTree(mt); err != nil {
+	if err = mt.PrintTree(); err != nil {
 		log.Println("Buffered IO failed:", err)
 		return
 	}
@@ -49,9 +49,9 @@ func constructAndPrint(f *os.File, cnum int64) {
 func proveMembership() {
 	// 1. Reconstruct (and verify) tree from JSON
 	// 2. Open file
-	// 3. merkletree.ProveMember(mt, f, 4, 2)
+	// 3. mt.ProveMember(f, 4, 2)
 
-	// exists, err := merkletree.ProveMember(mt, f, 4, 2)
+	// exists, err := mt.ProveMember(f, 4, 2)
 	// if err != nil {
 	// 	log.Println("Error verifying block:", err)
 	// 	return

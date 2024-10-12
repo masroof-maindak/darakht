@@ -25,16 +25,16 @@ type Node struct {
 	idx   int // index of this node within its tier
 }
 
-func ProveMember(mt *MerkleTree, f *os.File, idx, run int64) (bool, error) {
+func (mt *MerkleTree) ProveMember(f *os.File, idx, run int64) (bool, error) {
 	h, err := hashFileChunk(f, idx, run)
 	if err != nil {
 		return false, err
 	}
 
-	return ProveDigest(mt, h.Sum(nil)), nil
+	return mt.ProveDigest(h.Sum(nil)), nil
 }
 
-func Equals(mt1, mt2 *MerkleTree) bool {
+func (mt1 *MerkleTree) Equals(mt2 *MerkleTree) bool {
 	if mt1 == mt2 {
 		return true
 	}
@@ -64,8 +64,8 @@ func Equals(mt1, mt2 *MerkleTree) bool {
 }
 
 // Receives a leaf digest and returns whether it's a member of the tree or not
-func ProveDigest(mt *MerkleTree, hash []byte) bool {
-	idx := findLeafIndex(mt, hash)
+func (mt *MerkleTree) ProveDigest(hash []byte) bool {
+	idx := mt.findLeafIndex(hash)
 	if idx == -1 {
 		return false
 	}
@@ -95,7 +95,7 @@ func ProveDigest(mt *MerkleTree, hash []byte) bool {
 	return true
 }
 
-func findLeafIndex(mt *MerkleTree, target []byte) int {
+func (mt *MerkleTree) findLeafIndex(target []byte) int {
 	for i := 0; i < mt.n; i++ {
 		if bytes.Equal(target, mt.hashes[0][i].Data) {
 			return i
@@ -137,12 +137,12 @@ func getTierFromN(n int64) int {
 	return ret
 }
 
-func PrintTree(mt *MerkleTree) error {
+func (mt *MerkleTree) PrintTree() error {
 	depth, width := mt.t, mt.n
 	w := bufio.NewWriter(os.Stdout)
 
 	fmt.Fprintf(w, "{\n")
-	fmt.Fprintf(w, "\t\"root\": \"%x\",\n", MerkleRoot(mt))
+	fmt.Fprintf(w, "\t\"root\": \"%x\",\n", mt.MerkleRoot())
 	fmt.Fprintf(w, "\t\"t\": %d,\n", depth)
 	fmt.Fprintf(w, "\t\"n\": %d,\n", width)
 	fmt.Fprintf(w, "\t\"hashes\": [\n")
@@ -300,6 +300,6 @@ func genDigestsFromFile(f *os.File, cidxs []int64, cnum int64) ([][]byte, error)
 	return sums, nil
 }
 
-func MerkleRoot(m *MerkleTree) []byte {
-	return m.hashes[m.t-1][0].Data
+func (mt *MerkleTree) MerkleRoot() []byte {
+	return mt.hashes[mt.t-1][0].Data
 }
