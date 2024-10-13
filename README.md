@@ -28,12 +28,12 @@ go get github.com/masroof-maindak/darakht
 import "github.com/masroof-maindak/darakht/pkg/merkletree"
 
 // -- Construction --
-mt1, err := merkletree.InitTreeFromFile(fpath, cnum)
-// [TODO]: mt2, err := merkletree.RecoverTreeFromJSON()
+mt1, err := merkletree.NewMerkleTreeFromFile(fpath, cnum)
+// [TODO]: mt2, err := merkletree.NewMerkleTreeFromJSON()
 
 // -- Validation --
 equal := mt1.Equals(mt2)
-// [TODO]: valid, err := merkletree.ValidateTreeJSON(fJson)
+// [TODO]: valid, err := merkletree.ValidateJSONFile(fJson)
 
 // -- Proof of membership --
 exists, err := mt.ProveMember(f, 4, 2)

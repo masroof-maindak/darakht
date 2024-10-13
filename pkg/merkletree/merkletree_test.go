@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestConstructionAndMerkleRoot(t *testing.T) {
-	mt, err := merkletree.InitTreeFromFile(f, cnum)
+	mt, err := merkletree.NewMerkleTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +58,7 @@ func TestEquals(t *testing.T) {
 	var mt1, mt2 *merkletree.MerkleTree
 	var err error
 
-	mt1, err = merkletree.InitTreeFromFile(f, cnum)
+	mt1, err = merkletree.NewMerkleTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -67,7 +67,7 @@ func TestEquals(t *testing.T) {
 		t.Error(equalityErr)
 	}
 
-	mt2, err = merkletree.InitTreeFromFile(f, cnum)
+	mt2, err = merkletree.NewMerkleTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}
@@ -77,7 +77,7 @@ func TestEquals(t *testing.T) {
 }
 
 func TestProveMember(t *testing.T) {
-	mt, err := merkletree.InitTreeFromFile(f, cnum)
+	mt, err := merkletree.NewMerkleTreeFromFile(f, cnum)
 	if err != nil {
 		t.Error(err)
 	}

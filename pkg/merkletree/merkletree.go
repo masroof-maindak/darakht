@@ -104,7 +104,20 @@ func (mt *MerkleTree) findLeafIndex(target []byte) int {
 	return -1
 }
 
-func InitTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
+func ValidateJSONFile() (bool, error) {
+	// Validates
+	return true, nil
+}
+
+
+func NewMerkleTreeFromJSON(f *os.File) (*MerkleTree, error) {
+	// Validates
+	// Deserialises
+	// Returns mt if no error occured
+	return nil, nil
+}
+
+func NewMerkleTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
 	if cnum <= 0 {
 		return nil, errors.New("invalid leaf count")
 	}
@@ -120,7 +133,7 @@ func InitTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
 		return nil, err
 	}
 
-	mt, err := initTreeFromDigests(digests)
+	mt, err := createTreeFromDigests(digests)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +150,10 @@ func getTierFromN(n int64) int {
 	return ret
 }
 
-func (mt *MerkleTree) PrintTree() error {
+// Write Merkle Tree to file; f must be accessed with os.Create
+func (mt *MerkleTree) Serialise(f *os.File) error {
 	depth, width := mt.t, mt.n
-	w := bufio.NewWriter(os.Stdout)
+	w := bufio.NewWriter(f)
 
 	fmt.Fprintf(w, "{\n")
 	fmt.Fprintf(w, "\t\"root\": \"%x\",\n", mt.MerkleRoot())
@@ -169,7 +183,13 @@ func (mt *MerkleTree) PrintTree() error {
 	return w.Flush()
 }
 
-func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
+// Print Merkle Tree to stdout
+func (mt *MerkleTree) Print() error {
+	return mt.Serialise(os.Stdout)
+}
+
+// Create and return full tree object from digests
+func createTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	nodeCount := len(digests)
 	if nodeCount > 0 && nodeCount&(nodeCount-1) != 0 {
 		return nil, errors.New("no. of digests is not a power of 2")
@@ -191,12 +211,13 @@ func initTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	return mt, nil
 }
 
+// Init tree object and copy leaves over
 func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
-	t := getTierFromN(int64(n))
+	_t := getTierFromN(int64(n))
 
 	mt := &MerkleTree{
-		hashes: make([][]*Node, t),
-		t:      t,
+		hashes: make([][]*Node, _t),
+		t:      _t,
 		n:      n,
 	}
 

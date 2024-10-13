@@ -34,13 +34,13 @@ func main() {
 
 // Construct a Merkle Tree from a file and print it to stdout
 func constructAndPrint(f *os.File, cnum int64) {
-	mt, err := merkletree.InitTreeFromFile(f, cnum)
+	mt, err := merkletree.NewMerkleTreeFromFile(f, cnum)
 	if err != nil {
 		log.Println("Merkle Tree generation failed:", err)
 		return
 	}
 
-	if err = mt.PrintTree(); err != nil {
+	if err = mt.Print(); err != nil {
 		log.Println("Buffered IO failed:", err)
 		return
 	}
