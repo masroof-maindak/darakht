@@ -20,6 +20,13 @@ const (
 	MISMATCHED_ROOTS_ERR string = "Roots in JSON file don't match"
 )
 
+type MerkleTreeTemp struct {
+	Root   string     `json:"root"`
+	T      int        `json:"t"`
+	N      int        `json:"n"`
+	Hashes [][]string `json:"hashes"`
+}
+
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
 	t      int       // no. of tiers
@@ -71,6 +78,15 @@ func (mt1 *MerkleTree) Equals(mt2 *MerkleTree) bool {
 	return true
 }
 
+func (mt *MerkleTree) findLeafIndex(target []byte) int {
+	for i := 0; i < mt.n; i++ {
+		if bytes.Equal(target, mt.hashes[0][i].data) {
+			return i
+		}
+	}
+	return -1
+}
+
 // Receives a leaf digest and returns whether it's a member of the tree or not
 func (mt *MerkleTree) ProveDigest(hash []byte) bool {
 	idx := mt.findLeafIndex(hash)
@@ -78,10 +94,9 @@ func (mt *MerkleTree) ProveDigest(hash []byte) bool {
 		return false
 	}
 
-	var li, ri, pi int
-	t := 0
+	for t := 0; t < mt.t-1; t++ {
+		var li, ri, pi int
 
-	for t < mt.t-1 {
 		if idx%2 == 0 {
 			li = idx
 			ri = idx + 1
@@ -97,35 +112,18 @@ func (mt *MerkleTree) ProveDigest(hash []byte) bool {
 		}
 
 		idx = pi
-		t++
 	}
 
 	return true
 }
 
-func (mt *MerkleTree) findLeafIndex(target []byte) int {
-	for i := 0; i < mt.n; i++ {
-		if bytes.Equal(target, mt.hashes[0][i].data) {
-			return i
-		}
-	}
-	return -1
-}
-
-type MerkleTreeTemp struct {
-	Root   string     `json:"root"`
-	T      int        `json:"t"`
-	N      int        `json:"n"`
-	Hashes [][]string `json:"hashes"`
-}
-
-// Checks if a JSON file holds a Merkle Tree
+// Checks if a JSON file holds a Merkle Tree. Destroys file cursor.
 func deserialiseJSONFile(fJson *os.File) (*MerkleTreeTemp, error) {
 	mtt := &MerkleTreeTemp{}
 
-	// CHECK - can we do this without wasting the seek pointer? Does the prior even matter?
+	// CHECK - can we do this without wasting the cursor? Does the prior even matter?
 	fJson.Seek(0, io.SeekStart)
-	// TODO: buffered reading
+	// TODO(?): buffered reading
 	b, err := io.ReadAll(fJson)
 	if err != nil {
 		return nil, err
@@ -194,7 +192,7 @@ func createMerkleTreeFromTemp(mtt *MerkleTreeTemp) (*MerkleTree, error) {
 
 	t, n, leaves := mtt.T, mtt.N, mtt.Hashes[0]
 
-	root, err := validateTempRoots(mtt.Root, mtt.Hashes[t-1][0])
+	_, err := validateTempRoots(mtt.Root, mtt.Hashes[t-1][0])
 	if err != nil {
 		return nil, err
 	}
@@ -213,10 +211,10 @@ func createMerkleTreeFromTemp(mtt *MerkleTreeTemp) (*MerkleTree, error) {
 		return nil, err
 	}
 
-	// TODO(?): Check at every tier
-
-	if !bytes.Equal(mt.MerkleRoot(), root) {
-		return nil, errors.New("Merkle Tree was tampered with!")
+	for i := 0; i < n; i += 2 {
+		if !mt.ProveDigest(digests[i]) {
+			return nil, errors.New("Merkle Tree was tampered with!")
+		}
 	}
 
 	return mt, nil
@@ -234,6 +232,19 @@ func NewMerkleTreeFromJSON(fJson *os.File) (*MerkleTree, error) {
 	}
 
 	return mt, nil
+}
+
+func getFileSize(f *os.File, cnum int64) (int64, error) {
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	if fi.Size() < cnum {
+		return 0, errors.New("file is too small to be chunked")
+	}
+
+	return fi.Size(), nil
 }
 
 func NewMerkleTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
@@ -260,20 +271,11 @@ func NewMerkleTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
 	return mt, nil
 }
 
-func getTierFromN(n int64) int {
-	ret := 0
-	for n > 0 {
-		n = (n >> 1)
-		ret++
-	}
-	return ret
-}
-
 // Write Merkle Tree to file; f must be accessed with os.Create
 func (mt *MerkleTree) Serialise(f *os.File) error {
 	depth, width := mt.t, mt.n
 
-	if (depth == 0) {
+	if depth == 0 {
 		return errors.New("Empty Merkle Tree: nothing to serialise")
 	}
 
@@ -312,6 +314,23 @@ func (mt *MerkleTree) Print() error {
 	return mt.Serialise(os.Stdout)
 }
 
+func hashChildrensData(left, right *Node) []byte {
+	// We have to sha the hexadecimal strings of each digest
+	conc := fmt.Sprintf("%x", left.data) + fmt.Sprintf("%x", right.data)
+	hash := sha256.Sum256([]byte(conc))
+	return hash[:]
+}
+
+func createParent(idx int, left, right *Node) *Node {
+	d := hashChildrensData(left, right)
+	return &Node{
+		data:  d,
+		left:  left,
+		right: right,
+		idx:   idx,
+	}
+}
+
 // Create and return full tree object from digests
 func createTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	nodeCount := len(digests)
@@ -335,6 +354,15 @@ func createTreeFromDigests(digests [][]byte) (*MerkleTree, error) {
 	return mt, nil
 }
 
+func getTierFromN(n int64) int {
+	ret := 0
+	for n > 0 {
+		n = (n >> 1)
+		ret++
+	}
+	return ret
+}
+
 // Init tree object and copy leaves over
 func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 	_t := getTierFromN(int64(n))
@@ -356,36 +384,6 @@ func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 	}
 
 	return mt
-}
-
-func createParent(idx int, left, right *Node) *Node {
-	d := hashChildrensData(left, right)
-	return &Node{
-		data:  d,
-		left:  left,
-		right: right,
-		idx:   idx,
-	}
-}
-
-func hashChildrensData(left, right *Node) []byte {
-	// We have to sha the hexadecimal strings of each digest
-	conc := fmt.Sprintf("%x", left.data) + fmt.Sprintf("%x", right.data)
-	hash := sha256.Sum256([]byte(conc))
-	return hash[:]
-}
-
-func getFileSize(f *os.File, cnum int64) (int64, error) {
-	fi, err := f.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	if fi.Size() < cnum {
-		return 0, errors.New("file is too small to be chunked")
-	}
-
-	return fi.Size(), nil
 }
 
 func genChunkIndexes(fsize, cnum int64) []int64 {
