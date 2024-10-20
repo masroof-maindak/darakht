@@ -4,13 +4,20 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
+	"io"
 	"os"
 )
 
-const NUM_CHUNKS int64 = 8
+const (
+	NUM_CHUNKS           int64  = 8
+	INVALID_HASH_ERR     string = "Invalid hash found!"
+	MISMATCHED_ROOTS_ERR string = "Roots in JSON file don't match"
+)
 
 type MerkleTree struct {
 	hashes [][]*Node // all hashes
@@ -104,17 +111,92 @@ func (mt *MerkleTree) findLeafIndex(target []byte) int {
 	return -1
 }
 
-func ValidateJSONFile() (bool, error) {
-	// Validates
-	return true, nil
+// Checks if a JSON file holds a Merkle Tree
+func deserialiseJSONFile(fJson *os.File) (map[string]interface{}, error) {
+	var mtMap map[string]interface{}
+
+	// CHECK - can we do this without wasting the seek pointer? Does it even matter?
+	fJson.Seek(0, io.SeekStart)
+	b, err := io.ReadAll(fJson)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(b, &mtMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return mtMap, nil
 }
 
+func validateJSONRoots(jsonR1, jsonR2 string) ([]byte, error) {
+	byteR1, err := hex.DecodeString(jsonR1)
+	if err != nil {
+		return nil, errors.New(INVALID_HASH_ERR)
+	}
 
-func NewMerkleTreeFromJSON(f *os.File) (*MerkleTree, error) {
-	// Validates
-	// Deserialises
-	// Returns mt if no error occured
-	return nil, nil
+	byteR2, err := hex.DecodeString(jsonR2)
+	if err != nil {
+		return nil, errors.New(INVALID_HASH_ERR)
+	}
+
+	if !bytes.Equal(byteR1, byteR2) {
+		return nil, errors.New(MISMATCHED_ROOTS_ERR)
+	}
+
+	return byteR1, nil
+}
+
+// Deserialises and checks if a JSON file holds a *valid* Merkle Tree
+func ValidateMerkleTreeFromJSONfile(mtMap map[string]interface{}) (*MerkleTree, error) {
+	// TODO: if the below don't exist, return an error rather than panicking
+	t := int(mtMap["t"].(float64))
+	n := int(mtMap["n"].(float64))
+	jsonRoot1 := mtMap["root"].(string)
+	leaves := mtMap["hashes"].([]interface{})[0].([]interface{})
+	jsonRoot2 := mtMap["hashes"].([]interface{})[t-1].([]interface{})[0].(string)
+
+	root, err := validateJSONRoots(jsonRoot1, jsonRoot2)
+	if err != nil {
+		return nil, err
+	}
+
+	digests := make([][]byte, int(n))
+	for i, leaf := range leaves {
+		strLeaf, err := hex.DecodeString(leaf.(string))
+		if err != nil {
+			return nil, errors.New(INVALID_HASH_ERR)
+		}
+		digests[i] = []byte(strLeaf)
+	}
+
+	mt, err := createTreeFromDigests(digests)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: Check at every tier
+
+	if !bytes.Equal(mt.MerkleRoot(), root) {
+		return nil, errors.New("Merkle Tree was tampered with!")
+	}
+
+	return mt, nil
+}
+
+func NewMerkleTreeFromJSON(fJson *os.File) (*MerkleTree, error) {
+	mtMap, err := deserialiseJSONFile(fJson)
+	if err != nil {
+		return nil, err
+	}
+
+	mt, err := ValidateMerkleTreeFromJSONfile(mtMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return mt, nil
 }
 
 func NewMerkleTreeFromFile(f *os.File, cnum int64) (*MerkleTree, error) {
@@ -245,7 +327,7 @@ func createParent(idx int, left, right *Node) *Node {
 }
 
 func hashChildrensData(left, right *Node) []byte {
-	// NOTE: we must convert to string else it SHAs the byte data
+	// We have to sha the hexadecimal strings of each digest
 	conc := fmt.Sprintf("%x", left.Data) + fmt.Sprintf("%x", right.Data)
 	hash := sha256.Sum256([]byte(conc))
 	return hash[:]
