@@ -15,6 +15,7 @@ import (
 
 const (
 	NUM_CHUNKS           int64  = 8
+	SHA256_STRING_LEN    int    = 64
 	INVALID_HASH_ERR     string = "Invalid hash found!"
 	MISMATCHED_ROOTS_ERR string = "Roots in JSON file don't match"
 )
@@ -26,9 +27,9 @@ type MerkleTree struct {
 }
 
 type Node struct {
-	Data  []byte
-	Left  *Node
-	Right *Node
+	data  []byte
+	left  *Node
+	right *Node
 	idx   int // index of this node within its tier
 }
 
@@ -61,7 +62,7 @@ func (mt1 *MerkleTree) Equals(mt2 *MerkleTree) bool {
 		for i := 0; i < width; i++ {
 			n1 := mt1.hashes[t][i]
 			n2 := mt2.hashes[t][i]
-			if !(bytes.Equal(n1.Data, n2.Data) && n1.idx == n2.idx) {
+			if !(bytes.Equal(n1.data, n2.data) && n1.idx == n2.idx) {
 				return false
 			}
 		}
@@ -91,7 +92,7 @@ func (mt *MerkleTree) ProveDigest(hash []byte) bool {
 		pi = li / 2
 
 		hd := hashChildrensData(mt.hashes[t][li], mt.hashes[t][ri])
-		if !bytes.Equal(hd, mt.hashes[t+1][pi].Data) {
+		if !bytes.Equal(hd, mt.hashes[t+1][pi].data) {
 			return false
 		}
 
@@ -104,33 +105,45 @@ func (mt *MerkleTree) ProveDigest(hash []byte) bool {
 
 func (mt *MerkleTree) findLeafIndex(target []byte) int {
 	for i := 0; i < mt.n; i++ {
-		if bytes.Equal(target, mt.hashes[0][i].Data) {
+		if bytes.Equal(target, mt.hashes[0][i].data) {
 			return i
 		}
 	}
 	return -1
 }
 
-// Checks if a JSON file holds a Merkle Tree
-func deserialiseJSONFile(fJson *os.File) (map[string]interface{}, error) {
-	var mtMap map[string]interface{}
+type MerkleTreeTemp struct {
+	Root   string     `json:"root"`
+	T      int        `json:"t"`
+	N      int        `json:"n"`
+	Hashes [][]string `json:"hashes"`
+}
 
-	// CHECK - can we do this without wasting the seek pointer? Does it even matter?
+// Checks if a JSON file holds a Merkle Tree
+func deserialiseJSONFile(fJson *os.File) (*MerkleTreeTemp, error) {
+	mtt := &MerkleTreeTemp{}
+
+	// CHECK - can we do this without wasting the seek pointer? Does the prior even matter?
 	fJson.Seek(0, io.SeekStart)
+	// TODO: buffered reading
 	b, err := io.ReadAll(fJson)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(b, &mtMap)
+	if !json.Valid(b) {
+		return nil, err
+	}
+
+	err = json.Unmarshal(b, &mtt)
 	if err != nil {
 		return nil, err
 	}
 
-	return mtMap, nil
+	return mtt, nil
 }
 
-func validateJSONRoots(jsonR1, jsonR2 string) ([]byte, error) {
+func validateTempRoots(jsonR1, jsonR2 string) ([]byte, error) {
 	byteR1, err := hex.DecodeString(jsonR1)
 	if err != nil {
 		return nil, errors.New(INVALID_HASH_ERR)
@@ -148,23 +161,47 @@ func validateJSONRoots(jsonR1, jsonR2 string) ([]byte, error) {
 	return byteR1, nil
 }
 
-// Deserialises and checks if a JSON file holds a *valid* Merkle Tree
-func ValidateMerkleTreeFromJSONfile(mtMap map[string]interface{}) (*MerkleTree, error) {
-	// TODO: if the below don't exist, return an error rather than panicking
-	t := int(mtMap["t"].(float64))
-	n := int(mtMap["n"].(float64))
-	jsonRoot1 := mtMap["root"].(string)
-	leaves := mtMap["hashes"].([]interface{})[0].([]interface{})
-	jsonRoot2 := mtMap["hashes"].([]interface{})[t-1].([]interface{})[0].(string)
+func validateMerkleTreeTemp(mtt *MerkleTreeTemp) bool {
+	if mtt.T == 0 || mtt.N == 0 {
+		return false
+	}
 
-	root, err := validateJSONRoots(jsonRoot1, jsonRoot2)
+	depth := mtt.T
+	width := mtt.N
+
+	if len(mtt.Root) != SHA256_STRING_LEN || len(mtt.Hashes) != depth {
+		return false
+	}
+
+	for t := 0; t < depth; t, width = t+1, width/2 {
+		if len(mtt.Hashes[t]) != width {
+			return false
+		}
+		for i := 0; i < width; i++ {
+			if len(mtt.Hashes[t][i]) != SHA256_STRING_LEN {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func createMerkleTreeFromTemp(mtt *MerkleTreeTemp) (*MerkleTree, error) {
+	if !validateMerkleTreeTemp(mtt) {
+		return nil, errors.New("Invalid merkle tree deserialised!")
+	}
+
+	t, n, leaves := mtt.T, mtt.N, mtt.Hashes[0]
+
+	root, err := validateTempRoots(mtt.Root, mtt.Hashes[t-1][0])
 	if err != nil {
 		return nil, err
 	}
 
 	digests := make([][]byte, int(n))
 	for i, leaf := range leaves {
-		strLeaf, err := hex.DecodeString(leaf.(string))
+		strLeaf, err := hex.DecodeString(leaf)
 		if err != nil {
 			return nil, errors.New(INVALID_HASH_ERR)
 		}
@@ -176,7 +213,7 @@ func ValidateMerkleTreeFromJSONfile(mtMap map[string]interface{}) (*MerkleTree, 
 		return nil, err
 	}
 
-	// TODO: Check at every tier
+	// TODO(?): Check at every tier
 
 	if !bytes.Equal(mt.MerkleRoot(), root) {
 		return nil, errors.New("Merkle Tree was tampered with!")
@@ -186,12 +223,12 @@ func ValidateMerkleTreeFromJSONfile(mtMap map[string]interface{}) (*MerkleTree, 
 }
 
 func NewMerkleTreeFromJSON(fJson *os.File) (*MerkleTree, error) {
-	mtMap, err := deserialiseJSONFile(fJson)
+	mtt, err := deserialiseJSONFile(fJson)
 	if err != nil {
 		return nil, err
 	}
 
-	mt, err := ValidateMerkleTreeFromJSONfile(mtMap)
+	mt, err := createMerkleTreeFromTemp(mtt)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +272,11 @@ func getTierFromN(n int64) int {
 // Write Merkle Tree to file; f must be accessed with os.Create
 func (mt *MerkleTree) Serialise(f *os.File) error {
 	depth, width := mt.t, mt.n
+
+	if (depth == 0) {
+		return errors.New("Empty Merkle Tree: nothing to serialise")
+	}
+
 	w := bufio.NewWriter(f)
 
 	fmt.Fprintf(w, "{\n")
@@ -247,7 +289,7 @@ func (mt *MerkleTree) Serialise(f *os.File) error {
 		fmt.Fprintf(w, "\t\t[\n")
 
 		for i := 0; i < width; i++ {
-			fmt.Fprintf(w, "\t\t\t\"%x\"", mt.hashes[t][i].Data)
+			fmt.Fprintf(w, "\t\t\t\"%x\"", mt.hashes[t][i].data)
 			if i != width-1 {
 				fmt.Fprintf(w, ",\n")
 			}
@@ -306,9 +348,9 @@ func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 	mt.hashes[0] = make([]*Node, n)
 	for i := 0; i < n; i++ {
 		mt.hashes[0][i] = &Node{
-			Data:  digests[i],
-			Left:  nil,
-			Right: nil,
+			data:  digests[i],
+			left:  nil,
+			right: nil,
 			idx:   i,
 		}
 	}
@@ -319,16 +361,16 @@ func initTreeAndLeaves(digests [][]byte, n int) *MerkleTree {
 func createParent(idx int, left, right *Node) *Node {
 	d := hashChildrensData(left, right)
 	return &Node{
-		Data:  d,
-		Left:  left,
-		Right: right,
+		data:  d,
+		left:  left,
+		right: right,
 		idx:   idx,
 	}
 }
 
 func hashChildrensData(left, right *Node) []byte {
 	// We have to sha the hexadecimal strings of each digest
-	conc := fmt.Sprintf("%x", left.Data) + fmt.Sprintf("%x", right.Data)
+	conc := fmt.Sprintf("%x", left.data) + fmt.Sprintf("%x", right.data)
 	hash := sha256.Sum256([]byte(conc))
 	return hash[:]
 }
@@ -404,5 +446,5 @@ func genDigestsFromFile(f *os.File, cidxs []int64, cnum int64) ([][]byte, error)
 }
 
 func (mt *MerkleTree) MerkleRoot() []byte {
-	return mt.hashes[mt.t-1][0].Data
+	return mt.hashes[mt.t-1][0].data
 }

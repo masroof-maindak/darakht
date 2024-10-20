@@ -40,7 +40,7 @@ func constructAndPrint(f *os.File, cnum int64) {
 	}
 
 	if err = mt.Print(); err != nil {
-		log.Println("Buffered IO failed:", err)
+		log.Println(err)
 		return
 	}
 }
