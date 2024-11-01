@@ -9,9 +9,9 @@ import (
 )
 
 func main() {
-	// TODO: See README.md->Usage->Executable for end-goal
 	fpath := flag.String("f", "", "path to file")
 	cnum := flag.Int64("c", merkletree.NUM_CHUNKS, "number of chunks/leaves")
+
 	flag.Parse()
 
 	if *fpath == "" {
@@ -26,9 +26,8 @@ func main() {
 	}
 	defer f.Close()
 
-	// TODO: Decide what to execute
 	constructAndPrint(f, *cnum)
-	proveMembership()
+	// proveMembership()
 }
 
 // Construct a Merkle Tree from a file and print it to stdout

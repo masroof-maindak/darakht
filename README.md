@@ -8,21 +8,11 @@ Currently, it does not provide support for sorting, which would allow us to retu
 
 ## Installation
 
-### Library
-
 ```bash
 go get github.com/masroof-maindak/darakht
 ```
 
-### Executable
-
-```bash
-# [TODO]: go install?
-```
-
 ## Usage
-
-### Library
 
 ```Go
 import "github.com/masroof-maindak/darakht/pkg/merkletree"
@@ -41,24 +31,6 @@ equal := mt1.Equals(mt2)
 
 // Validate a given content block's existence
 exists, err := mt2.ProveMember(f, 4, 2)
-```
-
-### Executable
-
-```bash
-# NOTE: none of these are functional at the moment
-
-# Print the Merkle Tree of a file
-darakht <file>
-
-# Serialise a merkle tree w/ 16 leaves to `tree.json`
-darakht <file> -c 16 > tree.json
-
-# Validate whether `tree.json` holds a valid Merkle Tree
-darakht -f=tree.json -validate
-
-# Prove that bytes 4 - 14 from <file> belong in the Merkle Tree seralised in tree.json
-darakht <file> -f=tree.json -prove 4 10
 ```
 
 ## Development
