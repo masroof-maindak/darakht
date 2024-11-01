@@ -1,0 +1,25 @@
+name: Go
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.1'
+
+    - name: Build
+      run: go build -o darakht ./cmd/darakht/main.go
+
+    - name: Test
+      run: go test ./pkg/merkletree/merkletree_test.go -v
